@@ -7,6 +7,15 @@ import { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import Link from 'next/link';
 
+// Deklarasi global untuk window.snap (untuk menghilangkan error 'as any')
+declare global {
+    interface Window {
+        snap: {
+            pay: (token: string, options: any) => void;
+        };
+    }
+}
+
 // Definisikan Interface untuk Customer
 interface CustomerDetails {
     first_name: string;
@@ -21,7 +30,6 @@ interface MidtransResult {
 
 export default function CheckoutPage() {
     // KOREKSI UTAMA: Panggil HOOKS di LEVEL TERATAS dan HANYA SEKALI.
-    // Kita panggil useCart() di sini, BUKAN di dalam handlePayment atau kondisi lain.
     const cart = useCart();
 
     // Ambil nilai yang diperlukan dari objek cart
@@ -60,10 +68,10 @@ export default function CheckoutPage() {
             const result = await response.json();
 
             if (response.ok && result.token) {
-                // 2. Tampilkan Pop-up Pembayaran Midtrans
-                (window as any).snap.pay(result.token, {
+                // KOREKSI FINAL: Menggunakan window.snap tanpa 'as any'
+                window.snap.pay(result.token, {
                     onSuccess: function (midtransResult: MidtransResult) {
-                        cart.clearCart(); // Akses clearCart dari objek cart
+                        cart.clearCart();
                         console.log(`Pembayaran Sukses! ID: ${midtransResult.transaction_id}`);
                         window.location.href = `/order-success`;
                     },
