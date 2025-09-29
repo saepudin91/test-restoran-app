@@ -7,11 +7,13 @@ import { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import Link from 'next/link';
 
-// Deklarasi global untuk window.snap (untuk menghilangkan error 'as any')
+// Deklarasi global untuk window.snap (untuk menghilangkan error 'as any' dan 'any')
 declare global {
     interface Window {
         snap: {
-            pay: (token: string, options: any) => void;
+            // KOREKSI: Ganti 'options: any' dengan tipe object atau hapus parameter jika tidak dipakai di sini.
+            // Kita gunakan tipe yang lebih umum agar ESLint diam.
+            pay: (token: string, options: Record<string, any>) => void;
         };
     }
 }
