@@ -7,13 +7,29 @@ import { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import Link from 'next/link';
 
-// Deklarasi global untuk window.snap (untuk menghilangkan error 'as any' dan 'any')
+// Definisikan Tipe data yang dibutuhkan oleh Midtrans Callback
+interface MidtransCallbackResult {
+    transaction_id: string;
+    status_code?: string;
+    status_message?: string;
+    // Tambahkan properti lain yang mungkin dikembalikan Midtrans saat error
+    // Agar tipe data di callback error juga aman dari ESLint
+    finish_redirect_url?: string;
+}
+
+// Definisikan SnapOptions dengan tipe data yang ketat
+interface SnapOptions {
+    onSuccess: (result: MidtransCallbackResult) => void;
+    // KOREKSI: Menggunakan tipe data ketat MidtransCallbackResult untuk error/close
+    onError: (result: MidtransCallbackResult) => void;
+    onClose: () => void;
+}
+
+// Deklarasi global untuk window.snap
 declare global {
     interface Window {
         snap: {
-            // KOREKSI: Ganti 'options: any' dengan tipe object atau hapus parameter jika tidak dipakai di sini.
-            // Kita gunakan tipe yang lebih umum agar ESLint diam.
-            pay: (token: string, options: Record<string, any>) => void;
+            pay: (token: string, options: SnapOptions) => void;
         };
     }
 }
@@ -25,16 +41,10 @@ interface CustomerDetails {
     phone: string;
 }
 
-// Definisikan tipe untuk respons pembayaran Midtrans
-interface MidtransResult {
-    transaction_id: string;
-}
-
 export default function CheckoutPage() {
     // KOREKSI UTAMA: Panggil HOOKS di LEVEL TERATAS dan HANYA SEKALI.
     const cart = useCart();
 
-    // Ambil nilai yang diperlukan dari objek cart
     const totalPrice = cart.getTotalPrice();
     const totalItems = cart.getTotalItems();
 
@@ -61,7 +71,6 @@ export default function CheckoutPage() {
                 body: JSON.stringify({
                     orderId,
                     grossAmount: totalPrice,
-                    // Akses item dari objek cart yang sudah dideklarasikan di atas
                     items: cart.items,
                     customerDetails: { ...customer, last_name: "Customer" },
                 }),
@@ -70,15 +79,18 @@ export default function CheckoutPage() {
             const result = await response.json();
 
             if (response.ok && result.token) {
-                // KOREKSI FINAL: Menggunakan window.snap tanpa 'as any'
+                // KOREKSI FINAL: Menggunakan window.snap dengan tipe data ketat
                 window.snap.pay(result.token, {
-                    onSuccess: function (midtransResult: MidtransResult) {
+                    onSuccess: function (midtransResult) {
                         cart.clearCart();
                         console.log(`Pembayaran Sukses! ID: ${midtransResult.transaction_id}`);
                         window.location.href = `/order-success`;
                     },
-                    onError: function () {
-                        console.error('Pembayaran Gagal.');
+                    // Menggunakan tipe yang ketat (MidtransCallbackResult)
+                    onError: function (midtransResult) {
+                        console.error('Pembayaran Gagal.', midtransResult.status_code, midtransResult.status_message);
+                        // Jika error, redirect ke halaman error
+                        window.location.href = `/order-error`;
                     },
                     onClose: function () {
                         console.warn('Anda menutup pop-up Midtrans.');
