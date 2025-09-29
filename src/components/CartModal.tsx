@@ -1,16 +1,17 @@
-// src/components/CartModal.tsx
 'use client';
 import { useCart } from '@/context/CartContext';
 import { Button } from './ui/button';
-import { ShoppingCart } from 'lucide-react'; // Asumsi Anda install lucide-react
+import { ShoppingCart } from 'lucide-react';
 import Link from 'next/link';
 
 export default function CartModal() {
-    const { items, getTotalItems, getTotalPrice } = useCart();
+    // KOREKSI 1: Hapus 'items' dan 'formattedPrice' yang tidak digunakan dari destructuring.
+    // Kita hanya butuh getTotalItems dan getTotalPrice.
+    const { getTotalItems } = useCart();
     const totalItems = getTotalItems();
-    const totalPrice = getTotalPrice();
 
-    const formattedPrice = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(totalPrice);
+    // Catatan: Variabel totalPrice dan formattedPrice telah dihapus di sini
+    // karena tidak ditampilkan di modal ini (hanya di halaman checkout).
 
     return (
         <div className="relative">

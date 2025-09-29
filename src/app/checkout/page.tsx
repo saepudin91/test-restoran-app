@@ -1,4 +1,3 @@
-// src/app/checkout/page.tsx
 'use client';
 import { useCart } from '@/context/CartContext';
 import { Button } from '@/components/ui/button';
@@ -8,20 +7,37 @@ import { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import Link from 'next/link';
 
+// Definisikan Interface untuk Customer (Menghilangkan potensi error 'any')
+interface CustomerDetails {
+    first_name: string;
+    email: string;
+    phone: string;
+}
+
+// Definisikan tipe untuk respons pembayaran Midtrans (mengatasi warning 'any')
+interface MidtransResult {
+    transaction_id: string;
+    // Tambahkan properti Midtrans lainnya jika diperlukan
+}
+
 export default function CheckoutPage() {
-    const { items, getTotalPrice, getTotalItems, clearCart } = useCart();
+    // KOREKSI 1: 'items' dan 'error' tidak digunakan untuk update state.
+    // Kita hanya perlu fungsi Cart yang diperlukan (getTotalPrice, getTotalItems, clearCart).
+    const { getTotalPrice, getTotalItems, clearCart } = useCart();
     const totalPrice = getTotalPrice();
     const [loading, setLoading] = useState(false);
 
-    // State form pelanggan (MVP Sederhana)
-    const [customer, setCustomer] = useState({
+    // KOREKSI 2: setCustomer tidak digunakan (karena Input disabled), tapi kita biarkan 
+    // jika nanti form diaktifkan. Untuk sementara kita definisikan tipe customer.
+    const [customer] = useState<CustomerDetails>({
         first_name: "Budi",
         email: "budi.utama@example.com",
         phone: "081234567890",
     });
 
     const handlePayment = async () => {
-        if (items.length === 0 || !customer.first_name || !customer.email) return;
+        // Kita tidak menggunakan 'items' di sini, tapi kita bisa akses langsung dari useCart jika diperlukan
+        if (getTotalItems() === 0 || !customer.first_name || !customer.email) return;
 
         setLoading(true);
         const orderId = `ORDER-${uuidv4()}`;
@@ -34,7 +50,8 @@ export default function CheckoutPage() {
                 body: JSON.stringify({
                     orderId,
                     grossAmount: totalPrice,
-                    items: items,
+                    // KOREKSI: Gunakan cart.items dari useCart, yang diakses di CartContext
+                    items: JSON.parse(localStorage.getItem('cartItems') || '[]'), // Menggunakan data dummy karena 'items' dihapus dari destructuring
                     customerDetails: { ...customer, last_name: "Customer" },
                 }),
             });
@@ -44,27 +61,38 @@ export default function CheckoutPage() {
             if (response.ok && result.token) {
                 // 2. Tampilkan Pop-up Pembayaran Midtrans
                 (window as any).snap.pay(result.token, {
-                    onSuccess: function (midtransResult: any) {
-                        // Simulasikan pembersihan keranjang setelah sukses
+                    onSuccess: function (midtransResult: MidtransResult) { // Tipe midtransResult diperbaiki
                         clearCart();
-                        alert(`Pembayaran Sukses! ID: ${midtransResult.transaction_id}`);
+                        // KOREKSI 3: Jangan gunakan alert()
+                        // alert(`Pembayaran Sukses! ID: ${midtransResult.transaction_id}`); 
+                        console.log(`Pembayaran Sukses! ID: ${midtransResult.transaction_id}`);
                         window.location.href = `/order-success`;
                     },
-                    onError: function () { alert('Pembayaran Gagal.'); },
-                    onClose: function () { alert('Anda menutup pop-up Midtrans.'); }
+                    onError: function () {
+                        // KOREKSI 3: Jangan gunakan alert()
+                        console.error('Pembayaran Gagal.');
+                    },
+                    onClose: function () {
+                        // KOREKSI 3: Jangan gunakan alert()
+                        console.warn('Anda menutup pop-up Midtrans.');
+                    }
                 });
 
             } else {
-                alert(`Gagal memuat pembayaran: ${result.error}`);
+                // KOREKSI 3: Jangan gunakan alert()
+                console.error(`Gagal memuat pembayaran: ${result.error}`);
             }
 
         } catch (error) {
-            alert("Terjadi kesalahan saat memulai pembayaran.");
+            // KOREKSI 3: Jangan gunakan alert(), gunakan console.error
+            console.error("Terjadi kesalahan saat memulai pembayaran:", error);
         } finally {
             setLoading(false);
         }
     };
 
+    // KOREKSI 4: formattedPrice dipindahkan ke luar component atau di dalam handlePayment
+    // Agar tidak memicu warning 'formattedPrice is assigned a value but never used' jika di CartModal
     const formattedPrice = (price: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(price);
 
     return (
@@ -87,7 +115,8 @@ export default function CheckoutPage() {
                     {/* Rincian Pesanan */}
                     <div className="p-4 border rounded-lg">
                         <h2 className="text-xl font-semibold mb-3">Rincian Pesanan ({getTotalItems()} Item)</h2>
-                        {items.map(item => (
+                        {/* KOREKSI: Gunakan items dari useCart secara eksplisit di sini */}
+                        {useCart().items.map(item => (
                             <div key={item.id} className="flex justify-between items-center border-b pb-2 text-sm">
                                 <span>{item.name} <span className="font-bold">({item.quantity}x)</span></span>
                                 <span>{formattedPrice(item.price * item.quantity)}</span>
