@@ -1,35 +1,45 @@
 // src/app/api/extract-product/route.ts
 
-//import { GoogleGenAI } from "@google/genai";
 import { NextResponse } from 'next/server';
+import { GoogleGenAI } from "@google/genai";
+
+// Interface untuk data yang diekstrak AI (agar TypeScript mengenali strukturnya)
+interface ExtractedProduct {
+    name: string;
+    description: string;
+    price: number;
+}
+
+// ----------------------------------------------------
+// INISIALISASI AI (Menggunakan sintaks yang stabil untuk Vercel)
+// ----------------------------------------------------
+
+// Menggunakan tanda seru (!) untuk meyakinkan TypeScript bahwa nilai pasti ada di Vercel
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 
-const aiModule = require('@google/genai');
-const GoogleGenAI = aiModule.GoogleGenAI || aiModule.default.GoogleGenAI;
-//const { GoogleGenAI } = aiModule;
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-// Helper: Mengubah URL gambar menjadi format Base64 untuk Gemini Vision
+// Helper: Mengubah URL gambar menjadi format Base64
 async function urlToBase64(url: string) {
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`Gagal mengambil gambar dari URL: ${response.statusText}`);
+    const fetchResponse = await fetch(url);
+    if (!fetchResponse.ok) {
+        throw new Error(`Gagal mengambil gambar dari URL: ${fetchResponse.statusText}`);
     }
-    const buffer = await response.arrayBuffer();
+    const buffer = await fetchResponse.arrayBuffer();
     return Buffer.from(buffer).toString("base64");
 }
 
 export async function POST(request: Request) {
     try {
         const { imageUrl } = await request.json();
+
         if (!imageUrl) {
             return NextResponse.json({ success: false, error: "URL gambar tidak ditemukan." }, { status: 400 });
         }
 
         const base64Image = await urlToBase64(imageUrl);
 
-        // Permintaan ke Gemini Vision dengan format JSON wajib
-        const response = await ai.models.generateContent({
+        // 1. Permintaan ke Gemini Vision
+        const geminiResponse = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: [{
                 role: 'user',
@@ -43,7 +53,9 @@ export async function POST(request: Request) {
             },
         });
 
-        const extractedData = JSON.parse(response.text);
+        // 2. Parsing dan Type Assertion (Memaksa Tipe Data untuk Hilangkan Garis Merah)
+        // Kita menggunakan tanda seru '!' pada .text untuk meyakinkan TSC.
+        const extractedData = JSON.parse(geminiResponse.text!) as ExtractedProduct;
 
         return NextResponse.json({ success: true, data: extractedData });
 
