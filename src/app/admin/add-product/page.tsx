@@ -3,30 +3,27 @@
 
 import { useState, useCallback } from 'react';
 import { addProductToFirestore } from '@/lib/firebase/firestore';
-//import { addProductToFirestore } from '@/lib/firebase/firestore';
-// Import UI Components
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-// TIDAK ADA IMPORT UNTUK uploadProductImage
 
+// Interface untuk hasil penyimpanan, mengatasi garis merah di result.error
 interface SaveResult {
     success: boolean;
-    error?: string; // Tanda '?' berarti properti 'error' ini opsional
+    error?: string; // Properti 'error' adalah opsional
 }
 
 interface ProductData {
     name: string;
     description: string;
     price: number;
+    imageUrl?: string; // Opsional di sini, tapi wajib saat save
 }
 
 const initialProductData: ProductData = { name: '', description: '', price: 0 };
 
 export default function AddProductPage() {
-    // ... (states dan handleFileChange, handleDataChange tetap sama)
-
     const [file, setFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
     const [productData, setProductData] = useState<ProductData>(initialProductData);
@@ -59,15 +56,12 @@ export default function AddProductPage() {
         setStatus('1. Mengunggah foto ke Cloudinary via API...');
 
         try {
-            // --- PERUBAHAN KRUSIAL: MENGIRIM FILE MENTAH MELALUI FormData ---
+            // Fetch pertama: Upload ke Cloudinary
             const formData = new FormData();
-            // Mengirim objek File yang diambil dari state
             formData.append('file', file);
 
-            // FETCH PERTAMA: UPLOAD ke CLOUDINARY API Route
             const uploadResponse = await fetch('/api/cloudinary-upload', {
                 method: 'POST',
-                // PENTING: Browser menangani Content-Type untuk FormData
                 body: formData,
             });
 
@@ -83,7 +77,7 @@ export default function AddProductPage() {
             setImageUrl(publicUrl);
             setStatus('2. Foto berhasil diunggah. Memanggil AI untuk ekstraksi...');
 
-            // FETCH KEDUA: EKSTRAKSI AI
+            // Fetch kedua: Ekstraksi AI
             const response = await fetch('/api/extract-product', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -93,7 +87,7 @@ export default function AddProductPage() {
             const result = await response.json();
 
             if (response.ok && result.success) {
-                setProductData(result.data);
+                setProductData({ ...result.data, imageUrl: publicUrl }); // Simpan URL gambar ke data produk
                 setIsExtracted(true);
                 setStatus('3. Ekstraksi AI Berhasil! Data siap disimpan. Koreksi jika perlu.');
             } else {
@@ -109,17 +103,18 @@ export default function AddProductPage() {
         }
     }, [file]);
 
-    // ... (handleSaveProduct dan JSX return tetap sama)
     const handleSaveProduct = async () => {
         if (!productData.name || !productData.price || !imageUrl) {
-            setStatus('Nama produk dan harga harus diisi sebelum disimpan.');
+            setStatus('Nama produk, harga, dan gambar harus diisi sebelum disimpan.');
+            // Tidak memanggil addProductToFirestore di sini, hanya return.
             return;
         }
 
         setLoading(true);
         setStatus('4. Menyimpan data produk ke Firestore...');
 
-        const result = await addProductToFirestore({ ...productData, imageUrl });
+        // Memanggil helper dan menerapkan Type Assertion
+        const result = await addProductToFirestore({ ...productData, imageUrl }) as SaveResult;
 
         if (result.success) {
             setStatus('✅ Produk berhasil disimpan dan tampil di menu!');
@@ -128,7 +123,8 @@ export default function AddProductPage() {
             setFile(null);
             setIsExtracted(false);
         } else {
-            setStatus(`❌ Gagal menyimpan"}`);
+            // result.error sekarang type-safe dan ditangkap dengan baik
+            setStatus(`❌ Gagal menyimpan: ${result.error || "Pesan error tidak tersedia."}`);
         }
 
         setLoading(false);
