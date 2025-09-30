@@ -23,7 +23,7 @@ export default function RootLayout({
         {/* Tambahkan Midtrans Snap Script di <head> */}
         <Script
           src="https://app.sandbox.midtrans.com/snap/snap.js" // URL Sandbox
-          data-client-key={process.env.MIDTRANS_CLIENT_KEY} // Ambil dari .env.local
+          data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY} // Ambil dari .env.local
           strategy="beforeInteractive" // Muat sebelum interaksi
         />
       </head>
