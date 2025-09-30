@@ -1,12 +1,11 @@
 // src/app/page.tsx
 
-import { getAvailableProducts } from "@/lib/firebase/data";
-import ProductCard from "@/components/ProductCard";
+// PENTING: Halaman ini tetap Server Component. Kita akan import Client Component di bawah.
 import CartModal from "@/components/CartModal";
+import ProductList from "@/components/ProductList"; // Kita akan buat komponen ini
+//import { addProductToFirestore } from '@/lib/firebase/firestore';
 
-export default async function LandingPage() {
-  const products = await getAvailableProducts();
-
+export default function LandingPage() {
   return (
     <>
       <div className="container mx-auto p-8">
@@ -15,15 +14,8 @@ export default async function LandingPage() {
           <CartModal />
         </header>
 
-        {products.length === 0 ? (
-          <p className="text-center text-gray-500 text-lg">Menu masih kosong. Silakan tambahkan dari halaman admin.</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {products.map(product => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        )}
+        {/* Panggil Client Component untuk fetching data */}
+        <ProductList />
       </div>
     </>
   );

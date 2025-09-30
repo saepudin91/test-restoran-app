@@ -2,12 +2,19 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { uploadProductImage } from '@/lib/firebase/storage';
 import { addProductToFirestore } from '@/lib/firebase/firestore';
+//import { addProductToFirestore } from '@/lib/firebase/firestore';
+// Import UI Components
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+// TIDAK ADA IMPORT UNTUK uploadProductImage
+
+interface SaveResult {
+    success: boolean;
+    error?: string; // Tanda '?' berarti properti 'error' ini opsional
+}
 
 interface ProductData {
     name: string;
@@ -18,6 +25,8 @@ interface ProductData {
 const initialProductData: ProductData = { name: '', description: '', price: 0 };
 
 export default function AddProductPage() {
+    // ... (states dan handleFileChange, handleDataChange tetap sama)
+
     const [file, setFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
     const [productData, setProductData] = useState<ProductData>(initialProductData);
@@ -47,18 +56,38 @@ export default function AddProductPage() {
         if (!file) { setStatus('Pilih foto terlebih dahulu.'); return; }
 
         setLoading(true);
-        setStatus('1. Mengunggah foto ke Firebase Storage...');
+        setStatus('1. Mengunggah foto ke Cloudinary via API...');
 
         try {
-            const url = await uploadProductImage(file);
-            setImageUrl(url);
+            // --- PERUBAHAN KRUSIAL: MENGIRIM FILE MENTAH MELALUI FormData ---
+            const formData = new FormData();
+            // Mengirim objek File yang diambil dari state
+            formData.append('file', file);
 
+            // FETCH PERTAMA: UPLOAD ke CLOUDINARY API Route
+            const uploadResponse = await fetch('/api/cloudinary-upload', {
+                method: 'POST',
+                // PENTING: Browser menangani Content-Type untuk FormData
+                body: formData,
+            });
+
+            const uploadResult = await uploadResponse.json();
+
+            if (!uploadResponse.ok || !uploadResult.success) {
+                setStatus(`ERROR: Gagal upload. ${uploadResult.error || 'Cek log server.'}`);
+                setLoading(false);
+                return;
+            }
+
+            const publicUrl = uploadResult.imageUrl;
+            setImageUrl(publicUrl);
             setStatus('2. Foto berhasil diunggah. Memanggil AI untuk ekstraksi...');
 
+            // FETCH KEDUA: EKSTRAKSI AI
             const response = await fetch('/api/extract-product', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ imageUrl: url }),
+                body: JSON.stringify({ imageUrl: publicUrl }),
             });
 
             const result = await response.json();
@@ -80,6 +109,7 @@ export default function AddProductPage() {
         }
     }, [file]);
 
+    // ... (handleSaveProduct dan JSX return tetap sama)
     const handleSaveProduct = async () => {
         if (!productData.name || !productData.price || !imageUrl) {
             setStatus('Nama produk dan harga harus diisi sebelum disimpan.');
@@ -98,7 +128,7 @@ export default function AddProductPage() {
             setFile(null);
             setIsExtracted(false);
         } else {
-            setStatus(`❌ Gagal menyimpan: ${result.error}`);
+            setStatus(`❌ Gagal menyimpan"}`);
         }
 
         setLoading(false);

@@ -3,37 +3,50 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from "@google/genai";
 
-// Interface untuk data yang diekstrak AI (agar TypeScript mengenali strukturnya)
 interface ExtractedProduct {
     name: string;
     description: string;
     price: number;
 }
 
-// ----------------------------------------------------
-// INISIALISASI AI (Menggunakan sintaks yang stabil untuk Vercel)
-// ----------------------------------------------------
-
-// Menggunakan tanda seru (!) untuk meyakinkan TypeScript bahwa nilai pasti ada di Vercel
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-
 
 // Helper: Mengubah URL gambar menjadi format Base64
 async function urlToBase64(url: string) {
-    const fetchResponse = await fetch(url);
-    if (!fetchResponse.ok) {
-        throw new Error(`Gagal mengambil gambar dari URL: ${fetchResponse.statusText}`);
+    console.log(`[DEBUG] Mencoba fetch URL: ${url}`);
+    try {
+        const fetchResponse = await fetch(url);
+        console.log(`[DEBUG] Fetch berhasil. Status: ${fetchResponse.status}`);
+        if (!fetchResponse.ok) {
+            console.error(`[ERROR] Gagal Fetch, Status: ${fetchResponse.status}, Text: ${fetchResponse.statusText}`);
+            throw new Error(`Gagal mengambil gambar dari URL: ${fetchResponse.statusText}. Status HTTP: ${fetchResponse.status}`);
+        }
+        const buffer = await fetchResponse.arrayBuffer();
+        return Buffer.from(buffer).toString("base64");
+    } catch (error) {
+        console.error("[CRITICAL ERROR] Kesalahan Jaringan/Fetch:", error instanceof Error ? error.message : "Kesalahan tidak dikenal.");
+        throw new Error("Gagal melakukan fetch URL gambar: Periksa URL atau masalah jaringan server.");
     }
-    const buffer = await fetchResponse.arrayBuffer();
-    return Buffer.from(buffer).toString("base64");
 }
+
+// --- CORS HANDLING WAJIB ---
+export async function OPTIONS() {
+    const response = new NextResponse(null, { status: 204 });
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+    return response;
+}
+// --- END CORS HANDLING ---
 
 export async function POST(request: Request) {
     try {
         const { imageUrl } = await request.json();
 
         if (!imageUrl) {
-            return NextResponse.json({ success: false, error: "URL gambar tidak ditemukan." }, { status: 400 });
+            const response = NextResponse.json({ success: false, error: "URL gambar tidak ditemukan." }, { status: 400 });
+            response.headers.set('Access-Control-Allow-Origin', '*');
+            return response;
         }
 
         const base64Image = await urlToBase64(imageUrl);
@@ -41,6 +54,7 @@ export async function POST(request: Request) {
         // 1. Permintaan ke Gemini Vision
         const geminiResponse = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
+            // ... (sisa konfigurasi Gemini)
             contents: [{
                 role: 'user',
                 parts: [
@@ -53,14 +67,20 @@ export async function POST(request: Request) {
             },
         });
 
-        // 2. Parsing dan Type Assertion (Memaksa Tipe Data untuk Hilangkan Garis Merah)
-        // Kita menggunakan tanda seru '!' pada .text untuk meyakinkan TSC.
         const extractedData = JSON.parse(geminiResponse.text!) as ExtractedProduct;
 
-        return NextResponse.json({ success: true, data: extractedData });
+        const response = NextResponse.json({ success: true, data: extractedData });
+        response.headers.set('Access-Control-Allow-Origin', '*');
+
+        return response;
 
     } catch (error) {
         console.error("AI Extraction Orchestration Failed:", error);
-        return NextResponse.json({ success: false, error: "Kegagalan pada proses orkestrasi AI." }, { status: 500 });
+        const errorMessage = error instanceof Error ? error.message : "Kegagalan pada proses orkestrasi AI.";
+
+        const response = NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
+        response.headers.set('Access-Control-Allow-Origin', '*');
+
+        return response;
     }
 }

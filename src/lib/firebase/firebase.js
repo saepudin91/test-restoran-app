@@ -16,7 +16,7 @@ const firebaseConfig = {
     apiKey: "AIzaSyAFIIPTdZPWsFjNCyvkuEwKdCzfsfon9d4",
     authDomain: "restoranappmvp.firebaseapp.com",
     projectId: "restoranappmvp",
-    storageBucket: "restoranappmvp.firebasestorage.app",
+    storageBucket: "restoranappmvp.appspot.com",
     messagingSenderId: "491916460341",
     appId: "1:491916460341:web:174d432181496f5a218c7c",
     measurementId: "G-JCW4T3MFKB"
